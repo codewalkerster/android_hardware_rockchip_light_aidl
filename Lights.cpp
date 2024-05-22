@@ -56,7 +56,7 @@ static int state2brightbess(const HwLightState& state) {
 const char* getDriverPath(LightType type) {
     switch (type) {
         case LightType::BACKLIGHT:
-            return "/sys/class/backlight/backlight/brightness";
+            return "/sys/class/backlight/backlight";
         case LightType::BUTTONS:
             return "/sys/class/leds/button-backlight/brightness";
         case LightType::BATTERY:
@@ -75,7 +75,12 @@ const char* getDriverPath(LightType type) {
 static int setLightFromType(LightType type, const HwLightState& state) {
     int err = 0;
     switch (type) {
-        case LightType::BACKLIGHT:
+        case LightType::BACKLIGHT: {
+            int brightness = state2brightbess(state);
+            std::string bl_path(getDriverPath(type));
+            err = write_int((bl_path + "/brightness").c_str(), brightness);
+            break;
+        }
         case LightType::BUTTONS: {
             int brightness = state2brightbess(state);
             err = write_int(getDriverPath(type), brightness);
@@ -193,11 +198,21 @@ static int access_rgb_blink() {
 }
 
 static int access_backlight() {
-    std::string backlight_path(getDriverPath(LightType::BACKLIGHT));
-    ALOGV("backlight_path: %s", backlight_path.c_str());
-    if (access(backlight_path.c_str(), F_OK) < 0) {
-        ALOGE("error: %s", strerror(errno));
+    std::string bl_path(getDriverPath(LightType::BACKLIGHT));
+    if (access((bl_path + "/brightness").c_str(), F_OK) < 0)
         return -errno;
+    if (access((bl_path + "/bl_power").c_str(), F_OK) < 0)
+        return -errno;
+    return 0;
+}
+
+static int power_on_backlight() {
+    int err = 0;
+    std::string bl_path(getDriverPath(LightType::BACKLIGHT));
+    err = write_int((bl_path + "/bl_power").c_str(), 0);
+    if (err != 0) {
+        ALOGE("Failed to power on backlight: %d", err);
+        return err;
     }
     return 0;
 }
@@ -206,6 +221,7 @@ ndk::ScopedAStatus Lights::getLights(std::vector<HwLight>* lights) {
     ALOGI("Lights reporting supported lights");
     _lights.clear();
     if (access_backlight() == 0) {
+        power_on_backlight();
         addLight(0, LightType::BACKLIGHT);
     }
     if (access_rgb() == 0) {
