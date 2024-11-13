@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,35 @@
 
 #pragma once
 
-#include <aidl/android/hardware/light/BnLights.h>
-#include "HkLights.h"
-#define LOG_TAG "RockchipLights"
+#include <aidl/android/hardware/light/LightType.h>
 
 namespace aidl {
 namespace android {
 namespace hardware {
 namespace light {
 
-// Default implementation that reports no supported lights.
-class Lights : public BnLights {
-    ndk::ScopedAStatus setLightState(int id, const HwLightState& state) override;
-    ndk::ScopedAStatus getLights(std::vector<HwLight>* types) override;
+enum CMD {
+    Backlight,
+    Version,
+    Display_Reset,
+    CFG_Init,
+};
 
-private:
-    void addLight(int const ordinal, LightType const type);
-    std::vector<HwLight> _lights;
-    BacklightType backlight_type = BacklightType::NONE;
-    HkLights hklights;
+enum BacklightType {
+    NONE,
+    PWM,
+    VU12
+};
+
+class HkLights {
+    public:
+        int access_backlight();
+        const char* get_path(LightType type);
+        int setBacklight(int brightness);
+    private:
+        std::string backlight_path = "";
+        int check_version(const char* path);
+        int write_int(const char* path, CMD cmd, int value);
 };
 
 }  // namespace light

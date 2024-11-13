@@ -167,8 +167,14 @@ ndk::ScopedAStatus Lights::setLightState(int id, const HwLightState& state) {
     if (err != 0) {
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
-    // Set lights.
-    err = setLightFromType(type, state);
+    if (type == LightType::BACKLIGHT && backlight_type == BacklightType::VU12) {
+        int brightness = state2brightbess(state);
+        err = hklights.setBacklight(brightness);
+    } else {
+        // Set lights.
+        err = setLightFromType(type, state);
+    }
+
     if (err == 0) {
         return ndk::ScopedAStatus::ok();
     }
@@ -220,9 +226,16 @@ static int power_on_backlight() {
 ndk::ScopedAStatus Lights::getLights(std::vector<HwLight>* lights) {
     ALOGI("Lights reporting supported lights");
     _lights.clear();
-    if (access_backlight() == 0) {
+    if (backlight_type == BacklightType::NONE
+            && access_backlight() == 0) {
         power_on_backlight();
         addLight(0, LightType::BACKLIGHT);
+        backlight_type = BacklightType::PWM;
+    }
+    if (backlight_type == BacklightType::NONE
+            && hklights.access_backlight() == 0) {
+        addLight(0, LightType::BACKLIGHT);
+        backlight_type = BacklightType::VU12;
     }
     if (access_rgb() == 0) {
         addLight(0, LightType::BATTERY);
