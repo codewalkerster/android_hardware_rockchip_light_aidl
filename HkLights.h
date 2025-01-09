@@ -43,6 +43,7 @@ class HkLights {
         int setBacklight(int brightness);
     private:
         std::string backlight_path = "";
+        int check_vidpid(const char *path);
         int check_version(const char* path);
         int write_int(const char* path, CMD cmd, int value);
 };

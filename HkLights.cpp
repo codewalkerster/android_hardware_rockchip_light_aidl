@@ -21,6 +21,8 @@
 #include <log/log.h>
 #include <string>
 #include <unistd.h>
+#include <fstream>
+#include <iostream>
 
 #include <aidl/android/hardware/light/LightType.h>
 
@@ -30,11 +32,19 @@ namespace hardware {
 namespace light {
 
 int HkLights::access_backlight() {
+    std::string check_target_path = "/sys/class/tty/ttyACM";
     std::string target_backlight = "/dev/ttyACM";
     for (int i=0; i<10; i++) {
         auto path = target_backlight + std::to_string(i);
+
         if (access(path.c_str(), F_OK) < 0)
             break;
+
+        auto check_path = check_target_path + std::to_string(i) + "/device/uevent";
+
+        if (check_vidpid(check_path.c_str()) < 0)
+            continue;
+
         if (check_version(path.c_str()) < 0)
             continue;
 
@@ -46,6 +56,22 @@ int HkLights::access_backlight() {
         return -errno;
 
     return 0;
+}
+
+int HkLights::check_vidpid(const char *path) {
+    std::ifstream uevent_path(path);
+
+    if(uevent_path.is_open()) {
+        std::string line;
+        while (std::getline(uevent_path, line)) {
+            if (line.rfind("PRODUCT=", 0) == 0 ) {
+                if (line.find ("1a86/fe0c") != std::string::npos)
+                    return 0;
+                break;
+            }
+        }
+    }
+    return -1;
 }
 
 int HkLights::check_version(const char* path) {
